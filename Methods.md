@@ -8,6 +8,7 @@
   - [Population Structure (VCF2PCACluster)](#population-structure-vcf2pcacluster)
   - [Private Alleles](#private-alleles)
   - [IDRISK](#idrisk)
+  - [Relatedness](#relatedness)
 - [Viability Assessment via Forward Simulations](#viability-assessment-via-forward-simulations)
 
 # Founders & Futures Analysis Methods
@@ -101,7 +102,17 @@ bcftools view -v snps -Oz -o LASTfc.split.setGT-2fdp40.fixed.4pixy-m00idp800.VO.
 
 ## Nucleotide Diversity ([PIXY](https://pixy.readthedocs.io/en/latest/))
 
-See [.sh]().
+π and d<sub>xy</sub> were calculated by cluster, source, and individual.
+
+```sh
+pixy --stats pi dxy \
+    --vcf ${VCF} \
+    --populations ${POPFILE} \
+    --window_size 50000 \
+    --n_cores 10 \
+    --output_folder ${OUT_DIR} \
+    --output_prefix ${OUT}
+```
 
 ## Runs of Homozygosity
 
@@ -135,14 +146,20 @@ VCF2PCACluster --InVCF ${VCF} --OutPut PCAs/${NAME} -InSampleGroup pop.info
 
 ## Private Alleles
 
-See [.R]().
+See [private-alleles.R](https://github.com/ThatLionLady/FoundersFutures/blob/main/private-alleles.R).
 
 ## ID<sub>RISK</sub>
 
-See [IDrisk folder]() for scripts. 
+See [IDrisk folder](https://github.com/ThatLionLady/FoundersFutures/tree/main/IDrisk) for scripts. 
+
+## Relatedness
+
+```sh
+ngsRelate -h "${VCF}" -A AF -T GT -c 1 -O "${OUT}" -p 10
+```
 
 # Viability Assessment via Forward Simulations
 
 Genetically explicit forward simulations were done using [SLiM v4](https://messerlab.org/slim/)
 
-See [SLiM folder]() for the lion-specific models and scripts to predict population size and heterozygosity of the population over a span of 20 years (cycles) in four scenarios: (1) the South African reintroduced lions only, (2) the population as it was at reintroduction (including the resident Mozambican male), (3) with supplementation, adding the Sabie males in cycle three, and (4) supplementing with an additional two males, LMP, in cycle six from additional data generated for this secondary supplementation event.
+See [SLiM folder](https://github.com/ThatLionLady/FoundersFutures/tree/main/SLiM) for the lion-specific models and scripts to predict population size and heterozygosity of the population over a span of 20 years (cycles) in four scenarios: (1) the South African reintroduced lions only, (2) the population as it was at reintroduction (including the resident Mozambican male), (3) with supplementation, adding the Sabie males in cycle three, and (4) supplementing with an additional two males, LMP, in cycle six from additional data generated for this secondary supplementation event.
