@@ -1,0 +1,337 @@
+// Zambezi Delta Lions, from founders with supplementation of 2 males in generation 3
+
+initialize() {
+    //defineConstant("I", 1); // specify iteration
+    defineConstant("C", "A1"); // specify chromosome
+    defineConstant("S", 237612120); // specify chromosome length
+    initializeSLiMModelType("nonWF");
+    defineConstant("K", 500); // carrying capacity
+    initializeSLiMOptions(keepPedigrees = T); // Keep pedigrees
+    initializeSex("A"); // Simulate separate sexes
+    initializeMutationRate(6.43e-9);  // Mutation rate for lions (DOI: 10.1101/2024.04.06.587788)
+    defineConstant("MU", 6.43e-9); // mutation rate (for use in user-defined function)
+    // *** What mutation type information would need to be added for ibs to work?
+    initializeMutationType("m1", 0.5, "f", 0.0); // non-coding
+    initializeGenomicElementType("g1", m1, 1.0);  // Uniform mutation type
+    initializeGenomicElement(g1, 0, S);  // Chromosome length: awk -v chr="$CHROM" '$1 == chr {print $2}' "$FAI"
+                                        // FYI: Genome length of 2297036696 2.3G (sum(fai$length) in R)
+    initializeRecombinationRate(1.2e-8);  // Recombination rate for cats (from literature <- where did I find this?)
+
+    // Create output directory
+    system("mkdir Run" + I);
+
+}
+
+// User-defined functions: (SLiM_9.11)
+// Effective population size based on heterozygosity
+function (float)estimateNe_Heterozygosity(o<Subpopulation>$ subpop)
+{
+    pi = calcHeterozygosity(p1.genomes);
+    return pi / (4 * MU);
+}
+
+// 24. nonWF model architecture -- 651-657
+// The first() event phase of the current tick provides an opportunity for actions immediately before reproduction, and (Pg 788)
+// the early() event phase of the current tick provides an opportunity for actions immediately after reproduction, and (Pg 788)
+// the later() event phase of the current tick provides an opportunity for actions before starting the next tick (Pg 788)
+
+1 first() {
+
+    catn("Reintroduction: @ Tick" + community.tick);
+
+    sim.addSubpop("p1", 19, 0.1578); // creates population of 19 individuals with last 3 males (3/19 = 0.1578 sex ratio)
+
+    p1.individuals.tag = 1:19; 
+    sim.tag = 20; 
+
+    // Sample order: KAR-F001, KAR-F002, KHA-F001, KHA-F002, MAK-F001, MAK-F002, MAK-F003, MAK-F004, MAK-F005, MAK-F006, TEM-F001, TEM-F002, TEM-F003, TEM-F004, TSW-F004, TSW-F005, MOZ-M001, TSW-M001, TSW-M002
+    // REAL ages
+    ages = c(2, 2, 5, 2, 6, 5, 5, 4, 8, 5, 3, 2, 3, 3, 2, 2, 4, 2, 2); 
+
+    // Apply ages and sexes to individuals in the population
+    p1.individuals.age = ages;
+
+    // Load the genomic data from a VCF file
+    p1.genomes.readFromVCF("/home/ubuntu/USS/caitlin/ZDC/LAST_ONE_fingerscrossed/SLiM/Input/" + C + ".TrueFounders.vcf", m1); 
+
+    females = p1.individuals[p1.individuals.sex == "F"];
+
+    // Initialize the mated flag and last mating tick for all females
+    for (f in females) {
+        f.setValue("mated", F);
+        f.setValue("lastMatedTick", -1);
+    }
+
+    // Open file in write mode to start a fresh CSV (removes old data)
+    file = "Run" + I + "/founders.txt";
+    writeFile(file, "Individual Sex Age"); // CSV header
+
+    // Write the original 19 individuals
+    for (ind in p1.individuals) {
+        line = paste(ind, ind.sex, ind.age);
+        writeFile(file, line, append=T);
+    }
+
+}
+
+// Supplementation by adding individuals from a VCF file
+
+3 first() {
+
+    catn("Supplementation: @ Tick " + sim.cycle);
+    
+    // Create a temporary subpopulation of new males
+    sim.addSubpop("p2", 2, 1.0);
+    newMales = p2.individuals;
+    
+    // Assign sex and age
+    newMales.age = 3;  // SAB males were 3 at translocation
+
+    // Assign unique tags
+    newMales.tag = sim.tag:(sim.tag + 1);
+    sim.tag = sim.tag + 2;
+
+    // Load their genomes from the VCF file
+    newMales.genomes.readFromVCF("/home/ubuntu/USS/caitlin/ZDC/LAST_ONE_fingerscrossed/SLiM/Input/" + C + ".SAB-supplement.vcf", m1);
+
+    // Merge new males into the main population (p1)
+    p1.takeMigrants(p2.individuals);
+
+    catn("Supplementation: Added two males: " + paste(newMales.tag, sep=", "));
+
+    // Open file in append mode
+    file = "Run" + I + "/founders.txt";
+
+    // Write the two new males
+    for (ind in newMales) {
+        line = paste(ind, ind.sex, ind.age);
+        writeFile(file, line, append=T);
+    }
+
+    // Remove temporary subpopulation
+    p2.removeSubpopulation();
+
+}
+
+// Define reproduction rules 
+// IMPORTANT FYI: (SLiM_24.1.2)
+// reproduction() callbacks are called for each individual in the model. The task of each callback is to generate the offspring from one focal individual.
+
+// SLiM_26.8 the focal sex of a reproduction() callback can be specified
+// addCrossed() adds an offspring resulting from a biparental cross
+
+2: reproduction(p1, "M") { // Iterating over each male
+
+    catn("Reproduction: " + individual.tag + "@ Tick" + community.tick);
+
+    // Identify eligible males and females based on age and sex
+    eligibleFemales = p1.individuals[p1.individuals.sex == "F" & p1.individuals.age >= 3 & p1.individuals.age <= 12];
+
+    // Clear mated status for all individuals each generation
+    for (f in eligibleFemales) {
+        f.setValue("mated", F);  // Reset mated status at the start of each generation
+    }
+
+    // Log size of females and other variables to check their values and sizes
+    catn("Number of females: " + size(eligibleFemales));  // Size of the females vector
+    catn("LastMatedTick size: " + size(eligibleFemales.getValue("lastMatedTick"))); // Size of the last tick vector
+
+    // Check if lastMatedTick and mated flags are being accessed correctly
+    for (f in eligibleFemales) {
+        catn("Female: " + f.tag + ", lastMatedTick: " + f.getValue("lastMatedTick") + ", mated: " + f.getValue("mated"));
+    }
+
+    // Only consider unmated females NOT mated in the previous tick (NEW ADD)
+    availableFemales = eligibleFemales[eligibleFemales.getValue("lastMatedTick") != community.tick - 1]; 
+
+    // Log breeders
+    catn("Available Females: " + size(availableFemales));
+    //catn(availableFemales);
+
+    if (individual.age > 4 ) {
+        // Select up to 3 mates
+        numMates = sample(c(1, 2, 3), 1);  // Randomly choose 1, 2, or 3 mates
+        mates = sample(availableFemales, min(numMates, size(availableFemales))); // Select up to `numMates`
+        catn(mates); 
+
+        for (f in mates) {  // Iterating over selected females
+            f.setValue("mated", T); // Mark the female as mated (NEW ADD)
+            // Only a percentage of mating results in conception (20–40%; from SDZWA Library: https://ielc.libguides.com/sdzg/factsheets/lions/reproduction)
+            // **** waiting on actual data from Willem to get conception rate per pairing, not per interaction
+            if (runif(1) < 0.4) {  // Example: 40% chance of successful conception (generates a random number between 0 and 1 and runs if < 0.4)
+                litterSize = sample(c(1, 2, 2, 2, 2, 3, 3, 3, 4, 4), 1); // 1-4 cubs (2 most common) 0.1, 0.4, 0.3, 0.2 distribution
+
+                // Create the offspring
+                for (i in 1:litterSize) {
+                    offspring = p1.addCrossed(f, individual);  // Cross male and female to create offspring (female must be parent1)
+                    offspring.age = 0;  // Cubs are born at age 0
+                    offspring.tag = sim.tag; // tag offspring
+                    sim.tag = sim.tag + 1; // assign next available tag
+                    offspring.fitnessScaling = 0.95;  // Infants start with higher survival probability
+
+                    // Set mated and lastMatedTick for new females
+                    if (offspring.sex == "F") {
+                        offspring.setValue("mated", F);
+                        offspring.setValue("lastMatedTick", -1);
+                    }
+
+                    // log the mating
+                    line = paste(community.tick, individual, f, offspring.tag);
+                    writeFile("Run" + I + "/matings.txt", line, append=T);
+                }
+            }
+
+            // Update the last mating tick for the female
+            f.setValue("lastMatedTick", community.tick);
+        }
+    } else {
+        catn("Skipping male: " + individual.tag);
+    }
+}
+
+early() {
+    // Store all current individual tags before mortality
+    allInds = p1.individuals;
+    initialTags = allInds.tag;
+
+    // CUB MORTALITY (age 0, 14% chance of death)
+    // 86% cub survival from Briers-Louw et al 2025 reintroduction manuscript
+    cubs = p1.individuals[p1.individuals.age == 0];
+    deathCubs = (runif(cubs.size()) > 0.86);
+    sim.killIndividuals(cubs[deathCubs]);
+
+    // MALE age-related mortality
+    indsM = p1.individuals[p1.individuals.sex == "M"];
+    agesM = indsM.age;
+    indsM09 = indsM[agesM == 9];
+    indsM10 = indsM[agesM == 10];
+    indsM11 = indsM[agesM >= 11];
+    deathM09 = (runif(indsM09.size()) < 0.10);
+    deathM10 = (runif(indsM10.size()) < 0.30);
+    sim.killIndividuals(c(indsM09[deathM09], indsM10[deathM10], indsM11));
+
+    // FEMALE age-related mortality
+    indsF = p1.individuals[p1.individuals.sex == "F"];
+    agesF = indsF.age;
+    indsF11 = indsF[agesF == 11];
+    indsF12 = indsF[agesF == 12];
+    indsF13 = indsF[agesF >= 13];
+    deathF11 = (runif(indsF11.size()) < 0.10);
+    deathF12 = (runif(indsF12.size()) < 0.30);
+    sim.killIndividuals(c(indsF11[deathF11], indsF12[deathF12], indsF13));
+
+    // Apply density-dependent regulation (single value for population)
+    meanSurvival = mean(p1.individuals.fitnessScaling);
+    densityEffect = K / (p1.individualCount + 1);  
+    p1.fitnessScaling = meanSurvival * densityEffect;
+
+    // Apply age-based survival (individual-level)
+    mortality = 0.01 * p1.individuals.age;
+    survival = 1 - mortality;
+    p1.individuals.fitnessScaling = survival;
+
+    // POACHING mortality (4% annually, 70:30 M:F, age > 2)
+    // 21% of founders from 2018-2022 from Briers-Louw et al 2025 reintroduction manuscript
+    // 79% survived over 5 years ⇒ (1−r)^5 = 0.79 ⇒ 1−r=0.79^(1/5) ≈ 0.957 ⇒ r ≈ 1−0.957 = 0.043
+    adultsEligible = p1.individuals[p1.individuals.age > 2];
+    malesEligible = adultsEligible[adultsEligible.sex == "M"];
+    femalesEligible = adultsEligible[adultsEligible.sex == "F"];
+
+    totalPoach = asInteger(0.04 * adultsEligible.size());
+    numPoachM = asInteger(0.70 * totalPoach);
+    numPoachF = totalPoach - numPoachM;
+
+    malesEligible = p1.individuals[p1.individuals.sex == "M" & p1.individuals.age > 2];
+    femalesEligible = p1.individuals[p1.individuals.sex == "F" & p1.individuals.age > 2];
+
+    poachM = (malesEligible.size() >= numPoachM) ? sample(malesEligible, numPoachM, replace=F) else malesEligible;
+    poachF = (femalesEligible.size() >= numPoachF) ? sample(femalesEligible, numPoachF, replace=F) else femalesEligible;
+
+    sim.killIndividuals(c(poachM, poachF));  
+
+    // Store remaining individuals after mortality
+    remainingTags = p1.individuals.tag;
+
+    // Identify individuals who did not survive
+    deadTags = setDifference(initialTags, remainingTags);
+    deadInds = allInds[match(deadTags, initialTags)];
+
+    // Log deaths
+    deathsFile = "Run" + I + "/deaths_" + sim.cycle + ".txt";
+    for (ind in deadInds) {
+        ageClass = (ind.age == 0) ? "cub" else "adult";
+        line = sim.cycle + " " + ind.tag + ": " + ind.sex + ", " + ind.age + " (" + ageClass + ")";
+        writeFile(deathsFile, line, append=T);
+    }
+}
+
+
+// Reporting after reproduction and fitness applied
+1 late() {
+
+    // set up report effective population size (SLiM_9.11)
+    p1.setValue("previous_N", p1.individualCount);
+    defineConstant("LOG", community.createLogFile("Run" + I + "/Ne_log.csv"));
+    LOG.addCycle();
+    LOG.addCustomColumn("N(t-1)", "p1.getValue('previous_N');");
+    LOG.addCustomColumn("N(t)", "p1.individualCount;");
+    LOG.addCustomColumn("Ne_heterozygosity", "estimateNe_Heterozygosity(p1);");
+    LOG.addCustomColumn("heterozygosity", "calcHeterozygosity(p1.genomes);");
+    LOG.addCustomColumn("inbreeding_load", "calcInbreedingLoad(p1.genomes);");
+    LOG.logRow();
+
+    // Track the sex distribution
+    males = p1.individuals[p1.individuals.sex == "M"];
+    females = p1.individuals[p1.individuals.sex == "F"];
+
+    // Print the sex distribution along with population size and max age
+    catn(sim.cycle + ": " + size(p1.individuals) + " individuals, " + size(males) + " males, " + size(females) + " females, Max age: " + max(p1.individuals.age));
+
+    ne=estimateNe_Heterozygosity(p1);
+    catn("Ne = " + ne);  
+    het=calcHeterozygosity(p1.genomes);
+    catn("heterozygosity = " + het);        
+    ib=calcInbreedingLoad(p1.genomes);
+    catn("inbreeding load = " + ib);
+
+}
+
+2:20 late() {
+
+    // calculate and report effective population size (SLiM_9.11)
+    LOG.logRow();
+    p1.setValue("previous_N", p1.individualCount);
+
+    // Track the sex distribution
+    males = p1.individuals[p1.individuals.sex == "M"];
+    females = p1.individuals[p1.individuals.sex == "F"];
+
+    // Print the sex distribution along with population size and max age
+    catn(sim.cycle + ": " + size(p1.individuals) + " individuals, " + size(males) + " males, " + size(females) + " females, Max age: " + max(p1.individuals.age));
+
+    // Print stats to terminal
+    ne=estimateNe_Heterozygosity(p1);
+    catn("Ne = " + ne);  
+    het=calcHeterozygosity(p1.genomes);
+    catn("heterozygosity = " + het);        
+    ib=calcInbreedingLoad(p1.genomes);
+    catn("inbreeding load = " + ib);
+
+    // print our age distribution after mortality
+    dist = sim.cycle + ": " + paste(sort(p1.individuals.age));
+    writeFile("Run" + I + "/age_distribution.txt", dist, append=T);
+
+    // Save VCFs from each tick
+    g = p1.individuals.genomes;
+    
+    // Construct file names
+    vcfFileT = "Run" + I + "/" + community.tick + "_SLiM_output.T.m0.vcf";
+    fullOutputFile = "Run" + I + "/" + community.tick + "_slimout.txt";
+
+    // Output VCFs (SLiM_18.4)
+    g.outputVCF(vcfFileT, simplifyNucleotides=T);
+    
+    // Output full simulation state
+    sim.outputFull(fullOutputFile);
+
+}
