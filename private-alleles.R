@@ -17,8 +17,6 @@ vcfGenind_ini <- vcfR2genind(vcf)
 
 # Count loci in genind
 nLoc(vcfGenind_ini)
-# should be 13,933,564
-# [1] 5523965
 
 vcfGenind <- vcfGenind_ini
 
@@ -26,9 +24,6 @@ vcfGenind <- vcfGenind_ini
 
 # Extract population code from individual names (first 3 letters)
 pop_codes <- substr(indNames(vcfGenind), 1, 3)
-
-# Fix known naming inconsistencies
-# pop_codes[pop_codes == "SAB"] <- "MOZ"
 
 # Assign to genind
 vcfGenind@pop <- as.factor(pop_codes)
@@ -91,10 +86,8 @@ transposed_matrix[zero_rows, , drop = FALSE]
 sum(zero_rows)  # number of alleles with 0 counts
 # [1] 0
 sum(transposed_matrix)
-# OLD [1] 509411
-# NOW [1] 324698
 
-# Actual SNP count (bcftools view -H | wc -l) = 13,933,564
+# Actual SNP count (bcftools view -H | wc -l)
 
 ############################################################################################
 ## Fixed Alleles (YAY IT'S PERFECT!)

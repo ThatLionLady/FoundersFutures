@@ -112,9 +112,6 @@ process_sample() {
     vcftools --gzvcf ${VCF} --indv ${SAMPLE} --exclude-bed IDrisk/BED/roh_${SAMPLE}.bed --recode --stdout | gzip -c > IDrisk/HET/noROH_indiv_${SAMPLE}.vcf.gz
     vcftools --gzvcf IDrisk/HET/noROH_indiv_${SAMPLE}.vcf.gz --het --out IDrisk/HET/noROH_indiv_${SAMPLE}
 
-    # Calculate heterozygosity outside ROH PLINK
-    #echo -e "${SAMPLE}\t${SAMPLE}" > ${SAMPLE}_sample_list.txt
-    #plink --vcf ${VCF} --keep ${SAMPLE}_sample_list.txt --exclude roh_${SAMPLE}.bed --allow-extra-chr --het --out het_${SAMPLE}
 }
 
 export -f process_sample

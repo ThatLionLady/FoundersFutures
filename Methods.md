@@ -162,4 +162,8 @@ ngsRelate -h "${VCF}" -A AF -T GT -c 1 -O "${OUT}" -p 10
 
 Genetically explicit forward simulations were done using [SLiM v4](https://messerlab.org/slim/)
 
-See [SLiM folder](https://github.com/ThatLionLady/FoundersFutures/tree/main/SLiM) for the lion-specific models and scripts to predict population size and heterozygosity of the population over a span of 20 years (cycles) in four scenarios: (1) the South African reintroduced lions only, (2) the population as it was at reintroduction (including the resident Mozambican male), (3) with supplementation, adding the Sabie males in cycle three, and (4) supplementing with an additional two males, LMP, in cycle six from additional data generated for this secondary supplementation event.
+See [SLiM folder](https://github.com/ThatLionLady/FoundersFutures/tree/main/SLiM) for the lion-specific models and scripts to predict population size and heterozygosity of the population over a span of 20 years (cycles) in four scenarios:  
+1. the South African reintroduced lions only,  
+2. the population as it was at reintroduction (including the resident Mozambican male),  
+3. with supplementation, adding the Sabie males in cycle three, and  
+4. supplementing with an additional two males, LMP, in cycle six from additional data generated for this secondary supplementation event.
