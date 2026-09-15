@@ -5,7 +5,7 @@
   - [Nucleotide Diversity (PIXY)](#nucleotide-diversity-pixy)
   - [Runs of Homozygosity](#runs-of-homozygosity)
   - [SNP Heterozygosity](#snp-heterozygosity)
-  - [Population Structure (VCF2PCACluster)](#population-structure-vcf2pcacluster)
+  - [Population Structure](#population-structure)
   - [Private Alleles](#private-alleles)
   - [IDRISK](#idrisk)
   - [Relatedness](#relatedness)
@@ -102,7 +102,7 @@ bcftools view -v snps -Oz -o LASTfc.split.setGT-2fdp40.fixed.4pixy-m00idp800.VO.
 
 ## Nucleotide Diversity ([PIXY](https://pixy.readthedocs.io/en/latest/))
 
-π and d<sub>xy</sub> were calculated by cluster, source, and individual.
+π and/or d<sub>xy</sub> were calculated by cluster, source, and individual.
 
 ```sh
 pixy --stats pi dxy \
@@ -138,7 +138,9 @@ plink --allow-extra-chr \
 vcftools --gzvcf ${VO} --het --out ${DIR}/HET/vcftools_${NAME}
 ```
 
-## Population Structure ([VCF2PCACluster](https://github.com/hewm2008/VCF2PCACluster))
+## Population Structure 
+
+[VCF2PCACluster](https://github.com/hewm2008/VCF2PCACluster)
 
 ```sh
 VCF2PCACluster --InVCF ${VCF} --OutPut PCAs/${NAME} -InSampleGroup pop.info 
@@ -154,6 +156,8 @@ See [IDrisk folder](https://github.com/ThatLionLady/FoundersFutures/tree/main/ID
 
 ## Relatedness
 
+[ngsRelate](https://github.com/angsd/ngsrelate)
+
 ```sh
 ngsRelate -h "${VCF}" -A AF -T GT -c 1 -O "${OUT}" -p 10
 ```
@@ -162,8 +166,8 @@ ngsRelate -h "${VCF}" -A AF -T GT -c 1 -O "${OUT}" -p 10
 
 Genetically explicit forward simulations were done using [SLiM v4](https://messerlab.org/slim/)
 
-See [SLiM folder](https://github.com/ThatLionLady/FoundersFutures/tree/main/SLiM) for the lion-specific models and scripts to predict population size and heterozygosity of the population over a span of 20 years (cycles) in four scenarios:  
+See [SLiM folder](https://github.com/ThatLionLady/FoundersFutures/tree/main/SLiM) for the lion-specific models and scripts to predict population size, heterozygosity, ID<sub>risk</sub>, and relatedness of the population over a span of 20 years (cycles) in four scenarios:  
 1. the South African reintroduced lions only,  
-2. the population as it was at reintroduction (including the resident Mozambican male),  
-3. with supplementation, adding the Sabie males in cycle three, and  
-4. supplementing with an additional two males, LMP, in cycle six from additional data generated for this secondary supplementation event.
+2. the population as it was at reintroduction (including the resident MOZ male),  
+3. with supplementation, adding the SAB males in cycle three, and  
+4. supplementing with an additional two males (LMP) in cycle six from additional data generated for this secondary supplementation event.
